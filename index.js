@@ -2,16 +2,15 @@
 
 /*
 TODO:
-get player states stored in global state
-get item collection locations on board
 get shoots and ladders on board
 start players moving on board random amounds
 start collecting items based on landing on things
 allow method for transmuting items into something tradable
 allow method for buying upgrades
-improve page title visuals
-style the "players" as humunculi
 */
+
+// scala lapidis hermetis = ladder of the hermetic stone
+// et casus = and bad luck / falling down
 
 class App {
   constructor() {
@@ -48,6 +47,11 @@ class App {
       {type: 'lead', pos: 80},
       {type: 'tin', pos: 90},
       {type: 'ps', pos: 100}
+    ];
+
+    this.paths = [
+      {from: 3, to: 24},
+      {from: 77, to: 45}
     ];
 
     this.loadFromStorage();
@@ -92,7 +96,9 @@ class App {
     //let newPos = this.players[0].pos + 1;
     //if (newPos > 100) {newPos = 1;}
     //this.players[0].pos = newPos;
-  
+    //let newPos = this.paths[0].to + 1;
+    //if (newPos > 100) {newPos = 20;}
+    //this.paths[0].to = newPos;
   }
 
   posToXY(pos) {
@@ -131,6 +137,7 @@ class App {
     ctx.font = "36px 'Almendra SC'";
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'hsl(33,28%,32%)';
     this.sources.forEach( s => {
       const xy = this.posToXY(s.pos);
       if (s.type !== 'ps') {
@@ -141,6 +148,38 @@ class App {
     });
 
     ctx.restore();
+  }
+
+  drawPaths(ctx) {
+    ctx.strokeStyle = 'hsl(33,28%,32%)';
+    const gridSize = 50;
+    this.paths.forEach( p => {
+      const fromxy = this.posToXY(p.from);
+      const toxy = this.posToXY(p.to);
+      if (p.from > p.to) {
+        //chute
+      } else {
+        //ladder
+        //draw edges
+        ctx.beginPath();
+        ctx.moveTo(fromxy.x + gridSize / 4, fromxy.y + gridSize / 2);
+        ctx.lineTo(toxy.x + gridSize / 4, toxy.y + gridSize / 2);
+        ctx.moveTo(fromxy.x + gridSize * 0.75, fromxy.y + gridSize / 2);
+        ctx.lineTo(toxy.x + gridSize * 0.75, toxy.y + gridSize / 2);
+        //draw rungs
+        const distx = fromxy.x - toxy.x;
+        const disty = fromxy.y - toxy.y;
+        const dist = Math.sqrt(distx * distx + disty * disty);
+        const rungCount = Math.round(dist / 20);
+        const dx = distx / rungCount;
+        const dy = disty / rungCount;
+        for (let i = 0; i < rungCount; i++) {
+          ctx.moveTo(fromxy.x - dx * (i + 0.5) + gridSize / 4, fromxy.y - dy * (i + 0.5) + gridSize / 2);
+          ctx.lineTo(fromxy.x - dx * (i + 0.5) + gridSize * 0.75, fromxy.y - dy * (i + 0.5) + gridSize / 2);
+        }
+        ctx.stroke();
+      }
+    });
   }
 
   drawCrucibles(ctx) {
@@ -162,6 +201,7 @@ class App {
     this.drawBoard(ctx);
 
     //items on board
+    this.drawPaths(ctx);
 
     //draw crucibles
     this.drawCrucibles(ctx);

@@ -40,11 +40,15 @@ canvas {
 
 #title {
   font-family: 'Almendra SC', serif;
-  font-size: 40px;
+  font-size: 34px;
   background: var(--bg-light);
-  /*, 'hsl(33,28%,72%)'];*/
   margin-bottom: 0.25em;
   padding: 0.1em 0.25em;
   border: 2px solid var(--border);
   box-shadow: 5px 5px 15px 5px hsla(0, 0%, 0%, 0.6);
+  text-align: center;
+}
+
+#titleSecond {
+  font-size: 20px;
 }
