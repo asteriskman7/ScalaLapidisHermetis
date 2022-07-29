@@ -3,6 +3,12 @@
   #id
 */
 
+:root {
+  --bg-light: hsl(33, 28%, 82%);
+  --bg-dark: hsl(33, 28%, 72%);
+  --border: hsl(33, 28%, 32%);
+}
+
 * {
   margin: 0;
 }
@@ -14,6 +20,7 @@ html {
 body {
   background-image: url('./EmeraldTablet.jpg');
   background-size: cover;
+  background-position: center;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -23,7 +30,7 @@ body {
 
 canvas {
   background: white;
-  border: 2px solid black;
+  border: 2px solid var(--border);
   box-shadow: 5px 5px 15px 5px hsla(0, 0%, 0%, 0.6);
 }
 
@@ -34,5 +41,10 @@ canvas {
 #title {
   font-family: 'Almendra SC', serif;
   font-size: 40px;
-  background: white;
+  background: var(--bg-light);
+  /*, 'hsl(33,28%,72%)'];*/
+  margin-bottom: 0.25em;
+  padding: 0.1em 0.25em;
+  border: 2px solid var(--border);
+  box-shadow: 5px 5px 15px 5px hsla(0, 0%, 0%, 0.6);
 }
