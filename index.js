@@ -2,10 +2,7 @@
 
 /*
 TODO:
-start collecting items based on landing on things
-draw something on the board to indicate the destination of a move
-allow method for transmuting items into something tradable
-allow method for buying upgrades
+draw something better on the board to indicate the destination of a move
 after getting the pstone you see a progress bar slowing increasing to
   immortaltiy. you can either wait for immortality or you can prestige
   to get more pstones that will make the progress bar go faster and
@@ -14,6 +11,9 @@ make crucible not have a transparent background
 make sliding follow the curve of the slide
 make sure that reloading will work no matter the saved crucible state (maybe force
   all crucibles to their destination location plus change state to roll on load?)
+make percent bar actually do something
+make percent bar text do something
+make percent bar text more interesting
 */
 
 // scala lapidis hermetis = ladder of the hermetic stone
@@ -43,33 +43,97 @@ class App {
       tin: '\u2643',
       crucible: '\ud83d\udf66',
       retort: '\ud83d\udf6d',
-      alembic: '\u2697'
+      alembic: '\u2697',
+      sun: '\u2600',
+      moon: '\u263e',
+      0: '\u25cb',
+      1: '\u25cf',
+      2: '\u007c',
+      3: '\u25b3',
+      4: '\u25fb',
+      5: '\u26e7'
     };
 
     //init board items
     this.sources = [
-      {gtype: 'source', type: 'mercury', pos: 10},
-      {gtype: 'source', type: 'salt', pos: 20},
+      {gtype: 'source', type: 'salt', pos: 10},
+      {gtype: 'source', type: 'mercury', pos: 20},
       {gtype: 'source', type: 'sulfur', pos: 30},
-      {gtype: 'source', type: 'air', pos: 40},
-      {gtype: 'source', type: 'earth', pos: 50},
-      {gtype: 'source', type: 'fire', pos: 60},
-      {gtype: 'source', type: 'water', pos: 70},
+      {gtype: 'source', type: 'water', pos: 40},
+      {gtype: 'source', type: 'fire', pos: 50},
+      {gtype: 'source', type: 'earth', pos: 60},
+      {gtype: 'source', type: 'air', pos: 70},
       {gtype: 'source', type: 'lead', pos: 80},
       {gtype: 'source', type: 'tin', pos: 90},
       {gtype: 'source', type: 'ps', pos: 100}
     ];
 
-    this.paths = [
-      {gtype: 'path', active: true, from: 3, to: 24},
-      {gtype: 'path', active: true, from: 76, to: 46},
-      {gtype: 'path', active: true, from: 77, to: 22},
-      {gtype: 'path', active: true, from: 26, to: 2}
-    ];
+    this.levelPaths = {
+      salt: [
+        {from: 12, to: 6, limit: 2},
+        {from: 16, to: 4, limit: 3},
+        {from: 6, to: 15, limit: 4},
+        {from: 3, to: 18, limit: 5}
+      ],
+      mercury: [
+        {from: 22, to: 2, limit: 4},
+        {from: 25, to: 14, limit: 3},
+        {from: 17, to: 24, limit: 5}
+      ],
+      sulfur: [
+        {from: 32, to: 12, limit: 2},
+        {from: 37, to: 16, limit: 3},
+        {from: 14, to: 28, limit: 5}
+      ],
+      water: [
+        {from: 43, to: 4, limit: 2},
+        {from: 46, to: 25, limit: 3},
+        {from: 13, to: 45, limit: 5}
+      ],
+      fire: [
+        {from: 52, to: 47, limit: 2},
+        {from: 56, to: 26, limit: 4},
+        {from: 39, to: 58, limit: 5}
+      ],
+      earth: [
+        {from: 63, to: 44, limit: 2},
+        {from: 69, to: 13, limit: 4},
+        {from: 34, to: 65, limit: 5}
+      ],
+      air: [
+        {from: 79, to: 42, limit: 3},
+        {from: 77, to: 55, limit: 4},
+        {from: 53, to: 74, limit: 5}
+      ],
+      lead: [
+       {from: 83, to: 23, limit: 2},
+       {from: 85, to: 34, limit: 3},
+       {from: 49, to: 88, limit: 5},
+      ],
+      tin: [
+        {from: 93, to: 66, limit: 2},
+        {from: 96, to: 54, limit: 3},
+        {from: 98, to: 5, limit: 4},
+        {from: 9, to: 92, limit: 5}
+      ],
+      ps: []
+    }
+
+    this.loadFromStorage();
+
+    this.paths = [];
+    Object.keys(this.levelPaths).forEach( l => {
+      this.levelPaths[l].forEach( p => {
+        p.gtype = 'path';
+        p.level = l;
+        this.paths.push(p);
+      });
+    });
+    this.paths.sort( (a, b) => b.from - a.from );
+    this.updateActivePaths();
 
     this.updateGridMap();
 
-    this.loadFromStorage();
 
     this.drawBoard(this.boardctx);
 
@@ -100,8 +164,9 @@ class App {
       lead: 0,
       tin: 0,
       ps: 0,
-      maxMove: 1,
+      maxMove: 2,
       moveSpeed: 1,
+      collectMult: 1,
       t: 0
     };
 
@@ -127,10 +192,16 @@ class App {
     this.gridMap = {};
 
     this.paths.forEach( p => {
+      if (this.gridMap[p.from] !== undefined) {
+        throw 'duplicate map';
+      }
       this.gridMap[p.from] = p;
     });
 
     this.sources.forEach( s => {
+      if (this.gridMap[s.pos] !== undefined) {
+        throw 'duplicate map';
+      }
       this.gridMap[s.pos] = s;
     });
   }
@@ -140,19 +211,35 @@ class App {
     this.draw();
   }
 
+  updateActivePaths() {
+    const ALLACTIVE = false;
+    let anyUpdates = false;
+    this.paths.forEach( p => {
+      if (p.from > p.to) {
+        //slide
+        const newState = this.state[p.level] < p.limit || ALLACTIVE;
+        anyUpdates = anyUpdates || (newState !== p.active);
+        p.active = newState;
+      } else {
+        //ladder
+        const newState = this.state[p.level] >= p.limit || ALLACTIVE;
+        anyUpdates = anyUpdates || (newState !== p.active);
+        p.active = newState;
+      }
+    });
+    if (anyUpdates) {
+      this.drawBoard(this.boardctx);
+    }
+  }
+
+  forcePos(pos) {
+    const c = this.state.crucibles[0];
+    c.state = 'roll';
+    c.pos = pos;
+  }
+
   update() { 
     this.state.t += 1 / 60;
-    //let newPos = this.players[0].pos + 1;
-    //if (newPos > 100) {newPos = 1;}
-    //this.players[0].pos = newPos;
-    //let newPos = this.paths[0].to + 1;
-    //if (newPos > 100) {newPos = 20;}
-    //this.paths[0].to = newPos;
-    //let newPos = this.paths[1].to + 1;
-    //if (newPos > 70) {
-    //  newPos = 1;
-    //}
-    //this.paths[1].to = newPos;
 
     //move crucibles
     this.state.crucibles.forEach( c => {
@@ -202,12 +289,27 @@ class App {
         case 'destination': {
           //figure out what is at our destination and do some action
           const gridItem = this.gridMap[c.pos];
-          if (gridItem !== undefined && gridItem.gtype === 'path') {
-            c.targetPos = gridItem.to;
-            c.basePos = c.pos;
-            c.moveStart = this.state.t;
-            c.xy = this.posToXY(c.pos);
-            c.state = 'move-path';
+          if (gridItem !== undefined) {
+            switch (gridItem.gtype) {
+              case 'path': {
+                if (gridItem.active) {
+                  c.targetPos = gridItem.to;
+                  c.basePos = c.pos;
+                  c.moveStart = this.state.t;
+                  c.xy = this.posToXY(c.pos);
+                  c.state = 'move-path';
+                } else {
+                  c.state = 'roll';
+                }
+                break;
+              }
+              case 'source': {
+                this.state[gridItem.type] = Math.min(5, this.state[gridItem.type] + this.state.collectMult);
+                this.updateActivePaths();
+                c.state = 'roll';
+                break;
+              }
+            }
           } else {
             c.state = 'roll';
           }
@@ -346,11 +448,62 @@ class App {
       let xy;
       if (c.state.split`-`[0] === 'move') {
         xy = c.xy;
+        ctx.fillStyle = 'green';
+        const targetxy = this.posToXY(c.targetPos);
+        ctx.fillRect(targetxy.x, targetxy.y, 10, 10);
       } else {
         xy = this.posToXY(c.pos);
       }
+      ctx.fillStyle = 'hsl(33,28%,32%)';
       ctx.fillText(this.symbols.crucible, xy.x + gridSize / 2, xy.y + gridSize / 2);
     });
+    ctx.restore();
+  }
+
+  drawCollectables(ctx) {
+    ctx.font = "36px 'Almendra SC'";
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = 'hsl(33,28%,32%)';
+    this.sources.forEach( (s, i) => {
+      const xy = this.posToXY(s.pos);
+      ctx.textAlign = 'right';
+      if (s.type !== 'ps') {
+        ctx.fillText(this.symbols[s.type], 35, xy.y + 10);
+      } else {
+        ctx.drawImage(this.images.pstone, 5, xy.y);
+      }
+      //ctx.fillText(this.state[s.type], 55, xy.y + 10);
+      const value = this.state[s.type];
+      ctx.textAlign = 'center';
+      ctx.fillText(this.symbols[value], 60, xy.y + 10);
+    });
+  }
+
+  drawProgress(ctx) {
+    ctx.save();
+    //draw text
+    ctx.font = "32px 'Almendra SC'";
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'hsl(33,28%,32%)';
+    ctx.fillText('Time remaining: 1y 123d 04h 10m 41s', this.canvas.width / 2, 520);
+
+    //draw progress bar
+    const p = 0.33;
+    const fullWidth = 580;
+    const height = 40;
+    ctx.fillRect(10, 550, fullWidth, height);
+    ctx.fillStyle = 'hsl(33, 28%, 72%)';
+    ctx.fillRect(10, 550, p * fullWidth, height);
+    ctx.font = "16px 'Almendra SC'";
+    if (p > 0.1) {
+      ctx.fillStyle = 'hsl(33, 28%, 32%)';
+      ctx.fillText(this.symbols.sun, p * fullWidth - 5, 555);
+    }
+    if (p < 0.9) {
+      ctx.fillStyle = 'hsl(33, 28%, 72%)';
+      ctx.fillText(this.symbols.moon, p * fullWidth + 22, 555);
+    }
     ctx.restore();
   }
 
@@ -359,10 +512,11 @@ class App {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.drawImage(this.boardBuffer, 0, 0);
 
-    //draw crucibles
     this.drawCrucibles(ctx);
 
-    //draw ui
+    this.drawCollectables(ctx);
+
+    this.drawProgress(ctx);
   }
 }
 
