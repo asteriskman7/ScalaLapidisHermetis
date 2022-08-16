@@ -200,7 +200,7 @@ class App {
     }
     this.updateActivePaths();
 
-    this.state.progress = this.state.progress * 0.90;
+    this.state.progress = this.state.progress * 1.10;
   }
 
   updateGridMap() {
