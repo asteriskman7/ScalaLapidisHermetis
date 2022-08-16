@@ -47,8 +47,51 @@ canvas {
   border: 2px solid var(--border);
   box-shadow: 5px 5px 15px 5px hsla(0, 0%, 0%, 0.6);
   text-align: center;
+  color: var(--border);
 }
 
 #titleSecond {
   font-size: 20px;
+}
+
+#dialog {
+  background: white;
+  position: absolute;
+  font-family: 'Almendra SC', serif;
+  font-size: 20px;
+  display: flex;
+  gap: 0.5em;
+  padding: 0.5em;
+  border: 2px solid var(--border);
+  box-shadow: 5px 5px 15px 5px hsla(0, 0%, 0%, 0.6);
+}
+
+#dialogtxt {
+  max-width: 20em;
+}
+
+button {
+  border: 2px solid var(--border);
+  font-family: 'Almendra SC', serif;
+  font-size: 24px;
+  margin-left: 1em;
+  background: var(--bg-light);
+  color: var(--border);
+}
+
+button:hover {
+  background: var(--bg-dark);
+}
+
+#buttonReset {
+  font-size: 16px;
+  box-shadow: 5px 5px 15px 5px hsla(0, 0%, 0%, 0.6);
+}
+
+#peek {
+  position: absolute;
+  top: 70px;
+  left: 650px;
+  opacity: 0.0;
+  transition: opacity 5s;
 }

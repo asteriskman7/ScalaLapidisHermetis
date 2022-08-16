@@ -2,18 +2,7 @@
 
 /*
 TODO:
-draw something better on the board to indicate the destination of a move
-after getting the pstone you see a progress bar slowing increasing to
-  immortaltiy. you can either wait for immortality or you can prestige
-  to get more pstones that will make the progress bar go faster and
-  make the whole game go faster
-make crucible not have a transparent background
 make sliding follow the curve of the slide
-make sure that reloading will work no matter the saved crucible state (maybe force
-  all crucibles to their destination location plus change state to roll on load?)
-make percent bar actually do something
-make percent bar text do something
-make percent bar text more interesting
 */
 
 // scala lapidis hermetis = ladder of the hermetic stone
@@ -140,6 +129,11 @@ class App {
     setInterval(() => this.tick(), 1000/60);
     setInterval(() => this.saveToStorage(), 5000);
 
+    document.getElementById('dialog').style.display = this.state.introShown ? 'none' : 'flex';
+    document.getElementById('buttonDialog').onclick = () => this.dialogClick();
+    this.resetClicks = 0;
+    document.getElementById('buttonReset').onclick = () => this.resetClick();
+
     //font-family: 'Almendra SC', serif;
   }
  
@@ -167,7 +161,11 @@ class App {
       maxMove: 2,
       moveSpeed: 1,
       collectMult: 1,
-      t: 0
+      t: 0,
+      progress: 0,
+      progressRate: 0.000000003170979195, //this number makes it take 10 years
+      introShown: false,
+      startTime: (new Date()).getTime()
     };
 
     if (rawState !== null) {
@@ -186,6 +184,23 @@ class App {
   reset() {
     localStorage.removeItem('SLH');
     window.location.reload();
+  }
+
+  finishGrid() {
+    this.state.crucibles[0].pos = 1;
+    this.state.crucibles[0].targetPos = 1;
+    this.state.crucibles[0].basePos = 1;
+    this.state.crucibles[0].state = 'roll';
+
+    //remove some items
+    for (let i = 0; i < 10; i++) {
+      const typeIndex = Math.floor(Math.random() * 9);
+      const type = this.sources[typeIndex].type;
+      this.state[type] = Math.max(0, this.state[type] - 1);
+    }
+    this.updateActivePaths();
+
+    this.state.progress = this.state.progress * 0.90;
   }
 
   updateGridMap() {
@@ -238,8 +253,31 @@ class App {
     c.pos = pos;
   }
 
+  getProgressRate() {
+    return Math.pow(9, this.state.ps) * this.state.progressRate;
+  }
+
   update() { 
+    if (this.state.progress >= 1) {
+      if (!this.state.finished) {
+        this.state.endTime = (new Date()).getTime();
+      }
+      this.state.finished = true;
+      this.showEnd();
+      return;
+    }
+
     this.state.t += 1 / 60;
+    this.state.progress += this.getProgressRate() / 60;
+
+    if (Math.random() > 0.9999) {
+      document.getElementById('peek').style.opacity = 0.1;
+      console.log('peek');
+      setTimeout(() => {
+        console.log('unpeek');
+        document.getElementById('peek').style.opacity = 0;
+      }, 3000);
+    }
 
     //move crucibles
     this.state.crucibles.forEach( c => {
@@ -307,6 +345,9 @@ class App {
                 this.state[gridItem.type] = Math.min(5, this.state[gridItem.type] + this.state.collectMult);
                 this.updateActivePaths();
                 c.state = 'roll';
+                if (gridItem.type == 'ps') {
+                  this.finishGrid();
+                }
                 break;
               }
             }
@@ -448,9 +489,8 @@ class App {
       let xy;
       if (c.state.split`-`[0] === 'move') {
         xy = c.xy;
-        ctx.fillStyle = 'green';
         const targetxy = this.posToXY(c.targetPos);
-        ctx.fillRect(targetxy.x, targetxy.y, 10, 10);
+        ctx.fillText(this.symbols.alembic, targetxy.x + gridSize / 2, targetxy.y + gridSize / 2);
       } else {
         xy = this.posToXY(c.pos);
       }
@@ -479,17 +519,34 @@ class App {
     });
   }
 
+  timeToObj(t) {
+    const result = {};
+
+    result.y = Math.floor(t / (365 * 24 * 60 * 60));
+    t = t % (365 * 24 * 60 * 60);
+    result.d = Math.floor(t / (24 * 60 * 60));
+    t = t % (24 * 60 * 60);
+    result.h = Math.floor(t / (60 * 60));
+    t = t % (60 * 60);
+    result.m = Math.floor(t / 60);
+    t = t % 60;
+    result.s = Math.round(t);
+
+    return result;
+  }
+
   drawProgress(ctx) {
     ctx.save();
     //draw text
+    const tr = this.timeToObj((1 - this.state.progress) / this.getProgressRate());
     ctx.font = "32px 'Almendra SC'";
     ctx.textBaseline = 'top';
     ctx.textAlign = 'center';
     ctx.fillStyle = 'hsl(33,28%,32%)';
-    ctx.fillText('Time remaining: 1y 123d 04h 10m 41s', this.canvas.width / 2, 520);
+    ctx.fillText(`Work remaining: ${tr.y.toString().padStart(2, 0)}y ${tr.d.toString().padStart(3, 0)}d ${tr.h.toString().padStart(2, 0)}h ${tr.m.toString().padStart(2, 0)}m ${tr.s.toString().padStart(2, 0)}s`, this.canvas.width / 2, 520);
 
     //draw progress bar
-    const p = 0.33;
+    const p = this.state.progress;
     const fullWidth = 580;
     const height = 40;
     ctx.fillRect(10, 550, fullWidth, height);
@@ -517,6 +574,46 @@ class App {
     this.drawCollectables(ctx);
 
     this.drawProgress(ctx);
+  }
+
+  dialogClick() {
+    this.state.introShown = true;
+    document.getElementById('dialog').style.display = 'none';
+  }
+
+  showEnd() {
+    if (!this.endShown) {
+      const playTime = (this.state.endTime - this.state.startTime) / 1000;
+      const to = this.timeToObj(playTime);
+      const playTimeStr = `${to.y.toString().padStart(2, 0)}y ${to.d.toString().padStart(3, 0)}d ${to.h.toString().padStart(2, 0)}h ${to.m.toString().padStart(2, 0)}m ${to.s.toString().padStart(2, 0)}s`;
+      
+      document.getElementById('dialogtxt').innerHTML = `
+      Congratulations!<br><br> This is delicious!...I mean you've saved
+      the world!
+      <br><br>
+      You took ${playTimeStr} though I could have done it much faster..
+      <br><br>
+      <button id='buttonDialog' onclick='app.reset()'>Reset</button>
+      `;
+      document.getElementById('dialog').style.display = 'flex';
+      this.endShown = true;
+    }
+  }
+
+  resetClick() {
+    this.resetClicks = this.resetClicks + 1;
+    const clicksLeft = 3 - this.resetClicks;
+    document.getElementById('buttonReset').innerText = `Reset in ${clicksLeft} clicks`;
+    if (clicksLeft <= 0) {
+      this.reset();
+    }
+
+    setTimeout(() => this.resetReset(), 5000);
+  }
+
+  resetReset() {
+    this.resetClicks = 0;
+    document.getElementById('buttonReset').innerText = `Reset`;
   }
 }
 
